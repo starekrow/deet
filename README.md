@@ -3,7 +3,7 @@
 *Format version: way early*
 
 *Note to visitors: This is still heavily under construction. The parser works
-and the docs are mostly correct, but some parts are incomplete and the spec is
+and the docs are mostly correct, but much is incomplete and the spec is
 still mixed with design commentary.*
 
 DEET borrows heavily from YAML and somewhat from INI files and markdown. It is 
@@ -21,9 +21,32 @@ of data that can be represented:
   * Map
   * ...and metadata, if desired
 
+Some useful formats for representation are supported:
+
+  * Blocks:
+    * JSON
+    * Binary - hex, base-64, base-2
+    * CSV - rows, columns, 1D/2D array
+  * In-line arrays
+  * Strings:
+    * Token-style
+    * C-style
+    * Raw
+    * Binary
+
 This is the Javascript parser. It's reasonably fast but is architected for 
 clarity at the expense of maximum speed. Javascript compatiblity includes IE11 
 and most any recent browser.
+
+## Unfinished
+
+These items aren't working in the parser yet:
+
+  * Numbers other than base-10
+  * Tab retention in strings and blocks
+  * CSV blocks
+  * In-line arrays
+  * C/Raw/Binary strings
 
 ## Using the Parser
 
@@ -176,7 +199,6 @@ for specifying characters by ordinal (or, if you prefer, code point).
 		- crlf: 0x0d,0x0a
 		- obr:  {
 		- cbr:  }
-		- bs:   \
 		- amp:  &
 		- lt:   <
 		- gt:   >
@@ -195,7 +217,7 @@ Raw strings do not allow any kind of escaping, and cannot contain double-quotes
 or line breaks:
 
     - r"So I said, 'What's up, dude?'"
-    - r"A token looks like this: {lf}"		// Not a line feed
+    - r"A token looks like this: {lf}"		# Not a line feed
     - r"mantis attack!!!  {\_OO_/}" 
 
 There are also binary strings, see the Binary Data feature for more info.

@@ -258,8 +258,13 @@ window.onload = function()
 	RunTest( "block1", "./block1.dt", "block\n1\n" );
 	RunTest( "block-chomp", "./block-chomp.dt", [ "block\n1\n", "block\n2\n\n\n", "block\n3", 4 ] );
 	RunTest( "block-comments", "./block-comments.dt", [ "block\n# 1\n" ] );
-	/* */
 	RunTest( "block-fold", "./block-fold.dt", [ "Para one\nPara two\n  indented\n  \nPara three\n" ] );
+	/* */
+	RunTest( "block-json", "./block-json.dt",   { "foo" : 1, "bar" : 2 } );
+	var hextest = [ 0x10, 0x23, 0xab, 0xcd ];
+	RunTest( "block-hex", "./block-hex.dt", new Uint8Array( hextest ) );
+	var hw = [72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100, 33];
+	RunTest( "block-b64", "./block-b64.dt", new Uint8Array( hw ) );
 }
 
 </script>

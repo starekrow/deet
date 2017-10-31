@@ -1,4 +1,4 @@
-/* Copyright (C) 2017 David O'Riva. MIT License.
+/* Copyright (C) 2017 David O'Riva. MIT Licenseø.
  *********************************************************/
 
 /*
@@ -209,6 +209,105 @@ _static.parseString = function( str, tokens )
 
 /*
 =====================
+stripBlockComments
+
+Removes any comments found in a block of text. Input may be a string or
+array. If array, it is modified in place.
+Returns an array of lines with all comments removed.
+Comments must follow all DEET guidelines for surrounding whitespace and content.
+=====================
+*/
+_static.stripBlockComments = function( text )
+{
+	if (typeof text == "string") {
+		text = text.split( "\n" );
+	}
+	var re = /((?:^| |\t)#(?:#{0,2}(?: .*|$)|[-=#]{3,}.*))$/;
+	for (let i = 0, ic = text.length; i < ic; ++i) {
+		let c = re.exec( text[ i ] );
+		if (c) {
+			text[ i ] = text[ i ].substr( 0, text[ i ].length - c[0].length );
+		}
+	}
+	return text;
+}
+
+/*
+=====================
+parseHexBlock
+
+Removes comments, collapses and converts a hex block to an Int8Array.
+Comments are stripped, then all whitespace is removed. Whitespace consists
+of the following characters:
+
+    (space) (tab) (cr) (lf) , : _
+
+If the result contains non-hex characters then a ParseError is thrown.
+If the result has an odd number of characters, the last nibble is filled with
+0 bits.
+If the result is empty, an empty Uint8Array is returned.
+=====================
+*/
+_static.parseHexBlock = function( text )
+{
+	text = DEET.stripBlockComments( text );
+
+	text = text.join( "" ).replace( /[ \t\r\n,:_]+/g, "" );
+	if (/[^0-9a-fA-F]/.exec( text )) {
+		throw new _static.ParseError( "invalid hex string" );
+	}
+	var l = text.length;
+	var out = new Uint8Array((l + 1) / 2);
+
+	for (let i = 0; i < l; i += 2) {
+		out[ i >> 1 ] = Number.parseInt( text.substr( i, 2 ), 16 );
+	}
+	if (l & 1) {
+		out[ l >> 1 ] = Number.parseInt( text.substr( l - 1, 1 ) + "0", 16 );
+	}
+	return out;
+}
+
+/*
+=====================
+parseBase64Block
+
+Removes comments, collapses and converts a base-64 block to an Int8Array.
+Comments are stripped, then all whitespace is removed. Whitespace consists
+of the following characters:
+
+    (space) (tab) (cr) (lf)
+
+If the result contains non-base-64 characters then a ParseError is thrown.
+If the result has the wrong number of characters, '=' padding is appended to
+fix it.
+If the result is empty, an empty Uint8Array is returned.
+=====================
+*/
+_static.parseBase64Block = function( text )
+{
+	text = DEET.stripBlockComments( text );
+
+	text = text.join( "" ).replace( /[ \t\r\n]+/g, "" );
+	var l = text.length;
+	if (l & 3) {
+		text += "===".substr( 0, 4 - (l & 3) );
+	}
+	try {
+		text = atob( text );
+	} catch (e) {
+		throw new _static.ParseError( "invalid base-64 string" );
+	}
+	l = text.length;
+	var out = new Uint8Array(l);
+	for (let i = 0; i < l; i++) {
+		out[ i ] = text.charCodeAt( i );
+	}
+	return out;
+}
+
+/*
+=====================
 parser (subobject)
 
 The parser object maintains state during the parsing of a DEET file. It's
@@ -257,8 +356,8 @@ parser.regex = {
 	,metadef: " *(?:: *(.*?)? *{-comment-}?)$"
 	,prevalue: "^( +)?(- +)?{-key-}?({-comment-})?({-meta-})?"
 	,num: "[-+]?(?:[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?|0x[0-9a-fA-F]+|0t[0-9]+|0l[0-7]+|0y[01]+)"
-	,blockspec: "[|>][0-9]*[-+bjxy]?"
-	,blockspec2: "([|>])([0-9]*)([-+bjxy]?)"
+	,blockspec: "[|>][0-9]*(?:[-+bjxy]|json|csv|hex|base-?64)?"
+	,blockspec2: "^([|>])([0-9]*)([-+bjxy]|json|csv|hex|base-?64)?$"
 	,val: "^(?:(null|false|true)|({-num-})|({-str-})|({-blockspec-})|(.*?))( *| +{-comment-})\r?$"
 	,blockline: "^( *)(.*?)\r?$"
 	,justcomment: "^{-comment-}$"
@@ -709,6 +808,7 @@ parser.prototype.defValue = function( indent, line )
 	def.wantVal = false;		
 }
 
+
 /*
 =====================
 parser.prototype.readBlock
@@ -782,9 +882,9 @@ parser.prototype.readBlock = function( indent, spec )
 		block = b2;
 	}
 	var chomp = spec[3] || "";
-	if (spec[3] == "+") {
+	if (chomp == "+") {
 		block.push("");
-	} else if (spec[3] == "-" || spec[3] == "") {
+	} else if (chomp == "-" || chomp == "") {
 		let scan;
 		for (scan = block.length - 1; scan >= 0; --scan) {
 			if (block[ scan ] != "") {
@@ -792,9 +892,21 @@ parser.prototype.readBlock = function( indent, spec )
 			}
 		}
 		block = block.slice( 0, scan + 1 );
-		if (spec[3] == "") {
+		if (chomp == "") {
 			block.push( "" );
 		}
+	} else if (chomp == "j" || chomp == "json") {
+		try {
+			let v = JSON.parse( block.join("") );
+			return v;
+		} catch (e) {
+			this.error = "cannot parse JSON";
+			return;
+		}
+	} else if (chomp == "x" || chomp == "hex") {
+		return DEET.parseHexBlock( block );
+	} else if (chomp == "b" || chomp == "base64" || chomp == "base-64" ) {
+		return DEET.parseBase64Block( block );
 	} else {
 		// TODO: binary
 	}
