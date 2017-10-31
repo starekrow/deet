@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>DEET tests</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<script type="text/javascript" src="../deet.js"></script>
+	<style type="text/css">
+		.hide {
+			display: none;
+		}
+		.test {
+
+		}
+		.name {
+			display: inline-block;
+			min-width: 150px;
+		}
+		.pass {
+			color: #494;
+		}
+		.fail {
+			color: #944;
+		}
+	</style>
+</head>
+<body>
+	DEET Tests
+
+<div id=tests>
+</div>
+
+<script type="text/javascript">
+
+
+/*
+=====================
+escapeHtml
+
+Escapes a string such that all characters in it render as text (no contained 
+HTML or script). This can be used for UI text or attribute values within HTML 
+tags. If `null` is given, returns `null`.
+
+This has the additional property of converting non-strings to strings as 
+follows:
+  * numbers - converted via .toString()
+  * boolean - becomes "true" or "false"
+  * other - becomes "[unexpected object]"
+
+The rationale for not invoking .toString on objects is that if you're calling 
+this function, you should already have a mostly valid value ready for insertion
+into the DOM, and this isn't the place to start calling random code.
+
+If you want to get errors instead, set escapeHtml.throw to either
+`true` or a class constructor.
+=====================
+*/
+function escapeHtml( str )
+{
+	if (typeof str != "string") {
+		if (escapeHtml.throw) {
+			if (typeof escapeHtml.throw == "function") {
+				throw new escapeHtml.throw( "Unexpected value in escapeHtml" );
+			}
+			throw new TypeError( "Unexpected value in escapeHtml" );
+		}
+		if (str === null) {
+			return str;
+		}
+		if (typeof str == "boolean") {
+			str = str ? "true" : "false";
+		} else if (typeof str == "number") {
+			str = str.toString();
+		} else {
+			str = "[unexpected object]";
+		}
+		return str;
+	}
+
+	const toks = {
+		 '&': '&amp;'
+		,'<': '&lt;'
+		,'>': '&gt;'
+		,'"': '&quot;'
+		,"'": '&#039;'
+	};
+
+	return str.replace( /[&<>"']/g, function(tok) { return toks[tok]; } );
+}
+
+
+/*
+=====================
+Node
+=====================
+*/
+function Node( arg )
+{
+	if (arg[0] == '#') {
+		return document.getElementById( arg.substr(1) );
+	}
+	return null;
+}
+
+/*
+=====================
+LoadText
+=====================
+*/
+function LoadText( url )
+{
+	return new Promise( function( res, rej ) {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", url, true);
+		xhr.onreadystatechange = function () {
+			if (xhr.readyState != XMLHttpRequest.DONE) {
+				return;
+			}
+			if (xhr.status == 200) {
+				res( xhr.responseText );
+			} else {
+				rej( xhr.status );
+			}
+		};
+		xhr.send();
+	} );
+}
+
+/*
+=====================
+CompareVars
+=====================
+*/
+function CompareVars( a, b )
+{
+	if (a === null) {
+		if (b === null) return;
+		return "not null";
+	}
+	if (typeof a != "object") {
+		if (a !== b) {
+			return "wrong value";
+		}
+		return;
+	}
+	if (b === null) {
+		return "null instead of object";
+	}
+	if (typeof b != "object") {
+		return "not an object";
+	}
+	if (a.__proto__ !== b.__proto__) {
+		return "object type mismatch";
+	}
+	if (a === b) { 
+		return; 
+	}
+	for (let k in a) {
+		if (!a.hasOwnProperty( k )) {
+			continue;
+		}
+		if (!b.hasOwnProperty( k )) {
+			return "missing property: " + k;
+		}
+		let r = CompareVars( a[k], b[k] );
+		if (r) {
+			return "" + k + ": " + r;
+		}
+	}
+	for (let k in b) {
+		if (b.hasOwnProperty( k ) && !a.hasOwnProperty( k )) {
+			return "unexpected property: " + k;
+		}
+	}
+}
+
+
+/*
+=====================
+RunTest
+=====================
+*/
+function RunTest( name, data, expect, opts )
+{
+	var ready;
+	if (data.substr(0,2) == "./") {
+		ready = LoadText( data + "?_=" + (+new Date) );
+	} else {
+		ready = Promise.resolve( data );
+	}
+	var tn = document.createElement( "DIV" );
+	tn.className = "test";
+	var tnn = document.createElement( "SPAN" );
+	tnn.innerHTML = escapeHtml( name );
+	tnn.className = "name";
+	Node( "#tests" ).appendChild( tn );
+	tn.appendChild( tnn );
+
+	return ready.then( function( got ) {
+		let n = document.createElement( "SPAN" );
+		try {
+			let d = DEET.parse( got, opts );
+			let diff = CompareVars( expect, d );
+			if (!diff) {
+				n.className = "pass";
+				n.innerHTML = "pass";
+			} else {
+				n.className = "fail";
+				n.innerHTML = "FAIL";
+				if (typeof diff == "string") {
+					n.innerHTML += " (" + diff + ")";
+				}
+			}
+		} catch (e) {
+			n.className = "fail";
+			n.innerHTML = "threw: " + e.toString();
+			console.error( e );
+		}
+		tn.appendChild( n );
+		return Promise.resolve();
+	}, function( stat ) {
+		let n = document.createElement( "DIV" );
+		n.className = "fail";
+		n.innerHTML = "Failed to load test data";
+		tn.appendChild( n );
+		return Promise.resolve();
+	} );
+}
+
+/*
+=====================
+onload
+=====================
+*/
+window.onload = function()
+{
+	/* */
+	RunTest( "null", "./null.dt", null );
+	RunTest( "true", "./true.dt", true );
+	RunTest( "false", "./false.dt", false );
+	RunTest( "string", "./string.dt", "foo bar" );
+	RunTest( "number0", "./number0.dt", 0 );
+	RunTest( "autostring", "./autostring.dt", "foo bar" );
+	RunTest( "obj-prop", "./obj-prop.dt", { "foo" : "bar" } );
+	RunTest( "arr-el", "./arr-el.dt", [ "foo" ] );
+	RunTest( "comment1", "./comment1.dt", "check 1" );
+	RunTest( "comment2", "./comment2.dt", "check # 2" );
+	RunTest( "indent1", "./indent1.dt", "indent1" );
+	RunTest( "indent2", "./indent2.dt", [ "indent2" ] );
+	RunTest( "indent3", "./indent3.dt", { indent: 1, nest: [ 2, 3 ] } );
+	RunTest( "indent4", "./indent4.dt", { indent: [1], indent2: [2] } );
+	RunTest( "indent-drop2", "./indent-drop2.dt", { indent: [1,{x:7}], indent2: [2] } );
+	RunTest( "comment-indent", "./comment-indent.dt", { indent: [1,{x:7}], indent2: [2] } );
+	RunTest( "string-tok1", "./string-tok1.dt", "foo\t \r\n" );
+	RunTest( "tabs1", "./tabs1.dt", {ob1:1,ob2:2,ob3:[3],ob4:"4"} );
+	RunTest( "meta1", "./meta1.dt", "2test", { meta: { test: function(v,t) { return "" + v + t; } } } );
+	RunTest( "tabs2", "./tabs2.dt", {ob1:1,ob2:2,ob3:[3],ob4:"4"} );
+	RunTest( "block1", "./block1.dt", "block\n1\n" );
+	RunTest( "block-chomp", "./block-chomp.dt", [ "block\n1\n", "block\n2\n\n\n", "block\n3", 4 ] );
+	RunTest( "block-comments", "./block-comments.dt", [ "block\n# 1\n" ] );
+	/* */
+	RunTest( "block-fold", "./block-fold.dt", [ "Para one\nPara two\n  indented\n  \nPara three\n" ] );
+}
+
+</script>
+</body>
+</html>
