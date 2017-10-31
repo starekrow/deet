@@ -1,4 +1,4 @@
-/* Copyright (C) 2017 David O'Riva. All Rights Reserved.
+/* Copyright (C) 2017 David O'Riva. MIT License.
  *********************************************************/
 
 /*
