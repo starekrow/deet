@@ -51,11 +51,11 @@ Some useful formats for representation are supported:
 		B,      Jill,    5,    F,      Apprentice water carrier
 
 	places:
-		- name: 	   The Well
+		- name:        The Well
 		  purpose:     Contains/dispenses water
 		  coordinates: ((gps)) [ 38.759577, -121.129309 ]
 
-		- name: 	   The Hill
+		- name:        The Hill
 		  purpose:     Environmental obstacle
 		  coordinates: ((gps)) [ 38.759368, -121.129395 ]
 
@@ -637,7 +637,6 @@ declared with [metadata]().
 
 	# There are only a few options, shown here with their defaults:
 
-
 	((deet-tabs)): 8					# width of each tab stop in spaces
 	((deet-encoding)): UTF-8			# character encoding of the file
 	((deet-numerics)): false			# Parse Infinity, NaN as floating point
@@ -647,6 +646,8 @@ Options can be changed during parsing. Like other metadata, their declarations
 only affect the lines following that declaration at the indent level they
 occur at. This may be useful when a block of lines from a different source has
 to be incorporated into a file.
+
+
 
 #### deet-version
 
