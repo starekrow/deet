@@ -83,7 +83,7 @@ This parser has the following characteristics:
   * The parser accepts an optional "options" parameter that can initialize some
     format options and provide metadata handlers. See [Options]
 
-## Use
+### Use
 
 Include "deet.js" in your page, and then:
 	

@@ -18,10 +18,6 @@ function _DEET()
 DEET = _DEET;
 var _static = _DEET;
 
-//var _public = _DEET.prototype;
-//window.DEET = _DEET;
-//_public.toString = function() { return "[object DEET]"; }
-
 _static.version = "0.3";
 
 _static.builtinTokens = {
@@ -70,9 +66,12 @@ ParseError
 */
 _static.ParseError = function( message )
 {
-	Error.apply( this, [ message ] );
+    var temp = Error.apply(this, arguments);
+    temp.name = this.name = 'ParseError';
+    this.message = temp.message;
+    this.stack = temp.stack
 }
-_static.ParseError.prototype = Error;
+_static.ParseError.prototype = Object.create( Error.prototype );
 
 /*
 =====================
@@ -330,7 +329,7 @@ var parser = _static.parser = function( text, options )
 		 level: -1
 		,wantVal: true
 		,isRoot: true
-		,tabs: this.options.tabWidth || 4
+		,tabs: this.options.tabWidth || 8
 		,metadefs: {}
 	};
 	if (this.options.defaultSection) {
@@ -339,7 +338,7 @@ var parser = _static.parser = function( text, options )
 			,isSection: true
 			,val: this.sections
 			,name: this.options.defaultSection || "main"
-			,tabs: this.options.tabWidth || 4
+			,tabs: this.options.tabWidth || 8
 			,metadefs: {}
 		};
 	}
@@ -467,7 +466,7 @@ parser.prototype.run = function( /* until */ )
 		}
 	}
 	if (this.error) {
-		this.errorMessage = "Error: line " + (line) + ": " + this.error;
+		this.errorMessage = "line " + (this.line) + ": " + this.error;
 	}
 	return true;
 }
