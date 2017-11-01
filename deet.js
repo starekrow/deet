@@ -15,10 +15,14 @@ function _DEET()
 	throw new ReferenceError( "DEET cannot be instantiated" );
 }
 
+DEET = _DEET;
 var _static = _DEET;
-var _public = _DEET.prototype;
-window.DEET = _DEET;
-_public.toString = function() { return "[object DEET]"; }
+
+//var _public = _DEET.prototype;
+//window.DEET = _DEET;
+//_public.toString = function() { return "[object DEET]"; }
+
+_static.version = "0.3";
 
 _static.builtinTokens = {
 	 nul: "\u0000"

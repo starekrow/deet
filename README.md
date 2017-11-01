@@ -34,11 +34,116 @@ Some useful formats for representation are supported:
     * Raw
     * Binary
 
-This is the Javascript parser. It's reasonably fast but is architected for 
-clarity at the expense of maximum speed. Javascript compatiblity includes IE11 
-and most any recent browser.
 
-## Unfinished
+## Example
+
+	=== incident report ===
+
+	type: Off-site injury
+	date: 1532-05-01
+	time: 07:18:33
+	reported: 1532-05-01 07:26:59
+	rsa-digest: x"c627fb56f0582ea84f944a1957a770"
+
+	people: |csv
+		label,  name,    age,  gender, occupation
+		A,      Jack,    6,    M,      Water carrier
+		B,      Jill,    5,    F,      Apprentice water carrier
+
+	places:
+		- name: 	   The Well
+		  purpose:     Contains/dispenses water
+		  coordinates: ((gps)) [ 38.759577, -121.129309 ]
+
+		- name: 	   The Hill
+		  purpose:     Environmental obstacle
+		  coordinates: ((gps)) [ 38.759368, -121.129395 ]
+
+	things:
+		pail: Entered into evidence
+		crown: See notes
+
+	notes: >
+		There may be some confusion over whether the "crown"
+		mentioned in the report is the roof of individual A's 
+		cranial cavity or some form of decorative headgear.
+
+		Further investigation is warranted.
+
+
+## Javascript Implementation
+
+The Javascript parser is reasonably fast but is architected for clarity at the 
+expense of maximum speed. Compatiblity includes IE11 and most any recent 
+browser.
+
+This parser has the following characteristics:
+
+  * Binary strings and blocks are parsed as type `Uint8Array`.
+  * The parser accepts an optional "options" parameter that can initialize some
+    format options and provide metadata handlers. See [Options]
+
+## Use
+
+Include "deet.js" in your page, and then:
+	
+	var got = DEET.parse( some_text );
+
+The result will be the decoded contents of `some_text`.
+
+### Options
+
+These options can be set through the `options` argument to the parser:
+
+  * `tabWidth` - default spacing between tab stops. This can be overridden by
+    metadata in the file.
+  * `meta` - an object containing metadata handlers. See [Metadata Handling].
+  * `noSections` - if a section is encountered, throws a `ParseError`
+  * `defaultSection` - name the default section that values are placed in. If 
+    this is not set and a value is defined before any sections in the file,
+    that value will be placed in a section named `"default"`.
+  * `mapReplace` - if true, when a duplicate map key is encountered it will
+    replace the previously defined value. The default action in this case would
+    be to throw a ParseError.
+  * `mapMultiple` - if true, when a duplicate map key is encountered it will be 
+    placed in an array with any previously defined values. The default action
+    in this case would be to throw a ParseError. 
+  * `noThrow` - if true, all ParseErrors are handled internally by logging an
+    error to the console and returning `null` from `DEET.parse()`.
+
+### Metadata Handling
+
+The `meta` option, if provided, should be an object with keys corresponding to 
+the metadata tags of interest. The value for each key should be a handler
+function with the following signature:
+
+	function( metatag, value, definition )
+
+The function will be invoked after the value is fully parsed. This means that
+the value *must* be a well-formed DEET value for the current set of options.
+
+If a handler for a given tag is not found, and the tag contains ":", "-" or "."
+characters, the tag will be split along them and the prefixes will be looked up
+in the meta handler list. So the metatag `((player:info-height))` will try
+to invoke the following handlers in turn:
+
+  * `meta["player:info-height"]`
+  * `meta["player:info-*"]`
+  * `meta["player:*"]`
+
+In each case, the function will be invoked with the `metatag` argument set to 
+`"player:info-height"` and the `definition` argument set to the supplied 
+definition for `((player:info-height))`.
+
+Once a handler is found, it is invoked. The return value of the handler is used
+in place of the parsed value, so it is important to return the correct value 
+even if it is unchanged.
+
+Exceptions thrown from any metadata handler will be passed unchanged to the 
+caller of `DEET.parse()` (unless `options.noThrow` is true, in which case they 
+are handled like `ParseError` exceptions). 
+
+### Unfinished Parts
 
 These items aren't working in the parser yet:
 
@@ -48,13 +153,6 @@ These items aren't working in the parser yet:
   * In-line arrays
   * C/Raw/Binary strings
 
-## Using the Parser
-
-Include "deet.js" in your page, and then:
-	
-	var got = DEET.parse( some_text );
-
-The result will be the decoded contents of `some_text`.
 
 ## Format Overview
 
@@ -165,6 +263,7 @@ various other bases. Examples:
      - -0.5
      - 10e50
      - 1.455e-50
+     - ((number)) infinity
 
     strings-not-numbers:
      - .7					# The string ".7"
@@ -221,8 +320,6 @@ or line breaks:
     - r"mantis attack!!!  {\_OO_/}" 
 
 There are also binary strings, see the Binary Data feature for more info.
-
-
 
 ### Sections
 
@@ -389,8 +486,8 @@ Binary data can be represented as a string or a multi-line construct. The
 string format uses a "b" prefix and contains bytes encoded in base-64. The 
 trailing padding is always optional:
 
-	- b"SGVsbG8sIHdvcmxkIQ=="		// Hello, world!
-	- b"SGVsbG8sIHdvcmxkIQ"			// also Hello, world!
+	- b"SGVsbG8sIHdvcmxkIQ=="		# Hello, world!
+	- b"SGVsbG8sIHdvcmxkIQ"			# also Hello, world!
 
 You can also hex-encode data. Example hex-encoded binary string:
 
@@ -406,7 +503,7 @@ The multi-line format uses a flag on the "|" block format. These blocks should
 be formatted just like text, but their contents are converted to binary data. 
 The following strings are identical after decoding:
 
-	- <
+	- >
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec 
 		odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla 
 		quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent 
