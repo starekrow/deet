@@ -6,6 +6,12 @@
 
 DEET
 
+Implements a parser for the DEET format.
+
+Use:
+	let data = DEET.parse( some_text );
+
+
 ================================================================================
 */
 (function() {
@@ -62,6 +68,9 @@ var isObject = _static.isObject = function( v )
 /*
 =====================
 ParseError
+
+Typed error object, for exceptions.
+e.g. throw new DEET.ParseError( "blah blah blah" );
 =====================
 */
 _static.ParseError = function( message )
@@ -316,6 +325,9 @@ parser (subobject)
 The parser object maintains state during the parsing of a DEET file. It's
 pretty simple, but allows the parse itself to be cleanly broken into functional
 sections.
+
+@param string text Text to parse
+@param object options Optional map of parser-controlling option values.
 =====================
 */
 var parser = _static.parser = function( text, options )
@@ -329,7 +341,7 @@ var parser = _static.parser = function( text, options )
 		 level: -1
 		,wantVal: true
 		,isRoot: true
-		,tabs: this.options.tabWidth || 8
+		,tabs: this.options.tabWidth || 4
 		,metadefs: {}
 	};
 	if (this.options.defaultSection) {
@@ -338,7 +350,7 @@ var parser = _static.parser = function( text, options )
 			,isSection: true
 			,val: this.sections
 			,name: this.options.defaultSection || "main"
-			,tabs: this.options.tabWidth || 8
+			,tabs: this.options.tabWidth || 4
 			,metadefs: {}
 		};
 	}
@@ -369,6 +381,12 @@ parser.regex = {
 /*
 =====================
 parser.prepRegexStr
+
+Fetch a regular expression as a string from the parser's library of expressions.
+These strings can "include" other expressions from the library using a 
+"{-name-}" syntax.
+
+@param string re Name of expression to load.
 =====================
 */
 parser.prepRegexStr = function( re )
@@ -385,6 +403,10 @@ parser.prepRegexStr = function( re )
 /*
 =====================
 parser.prep
+
+Perform some one-time preparation of the parser.
+
+So far this only resolves all of the regular expressions in the library.
 =====================
 */
 parser.prep = function()
@@ -403,6 +425,8 @@ parser.prep = function()
 /*
 =====================
 parser.run
+
+Consume lines until we're done parsing.
 =====================
 */
 parser.prototype.run = function( /* until */ )
@@ -474,6 +498,8 @@ parser.prototype.run = function( /* until */ )
 /*
 =====================
 parser.getError
+
+If an error occurred, pull the message for it.
 =====================
 */
 parser.prototype.getError = function()
@@ -486,6 +512,8 @@ parser.prototype.getError = function()
 /*
 =====================
 parser.getResult
+
+Get the final result out of the stack or the current definition.
 =====================
 */
 parser.prototype.getResult = function( indent )
@@ -499,6 +527,9 @@ parser.prototype.getResult = function( indent )
 /*
 =====================
 parser.unwind
+
+Unwind the stack until we're at the specified indent level in the value 
+history.
 =====================
 */
 parser.prototype.unwind = function( indent )
@@ -524,6 +555,8 @@ parser.prototype.unwind = function( indent )
 /*
 =====================
 parser.defSection
+
+Define a new section in the result.
 =====================
 */
 parser.prototype.defSection = function( name )
@@ -550,6 +583,8 @@ parser.prototype.defSection = function( name )
 /*
 =====================
 parser.defMeta
+
+Handle metadata, passing it through the user-supplied handler if any.
 =====================
 */
 parser.prototype.defMeta = function( tag, val, indent )
@@ -578,6 +613,8 @@ parser.prototype.defMeta = function( tag, val, indent )
 /*
 =====================
 parser.getMetaDef
+
+Retrieve a defintion for the given metadata tag.
 =====================
 */
 parser.prototype.getMetaDef = function( tag )
@@ -597,30 +634,9 @@ parser.prototype.getMetaDef = function( tag )
 /*
 =====================
 parser.applyMeta
-=====================
-*/
-parser.prototype.applyMeta = function( val, tags )
-{
-	if (this.options.meta) {
-		for (let i = tags.length - 1; i >= 0; i-- ) {
-			var tag = tags[i];
-			var mdef = this.getMetaDef( tag );
-			var func = this.options.meta[ tag ];
-			if (typeof func == "function") {
-				val = func( val, tag, mdef );
-			} else if (typeof func == "string") {
-				if (typeof window[func] == "function") {
-					val = window[func]( val, tag, mdef );
-				}
-			}
-		}
-	}
-	return val;
-}
 
-/*
-=====================
-parser.applyMeta
+Apply the given metadata to a value. This only has an effect if the user
+supplies a handler(s) for the metadata tag.
 =====================
 */
 parser.prototype.applyMeta = function( val, tags )
@@ -645,6 +661,10 @@ parser.prototype.applyMeta = function( val, tags )
 /*
 =====================
 parser.assignValue
+
+Assign a value to the current key, element or section. This will also apply 
+any pending metdata tags. The mapReplace and mapMultiple options are sorted out 
+here, too.
 =====================
 */
 parser.prototype.assignValue = function( def, val )
@@ -686,6 +706,8 @@ parser.prototype.assignValue = function( def, val )
 /*
 =====================
 parser.defElement
+
+Sets up the definition of an array element.
 =====================
 */
 parser.prototype.defElement = function( indent )
@@ -728,6 +750,8 @@ parser.prototype.defElement = function( indent )
 /*
 =====================
 parser.defKey
+
+Sets up the definition of an map key.
 =====================
 */
 parser.prototype.defKey = function( indent, key )
@@ -776,6 +800,8 @@ parser.prototype.defKey = function( indent, key )
 /*
 =====================
 parser.prototype.defValue
+
+Parse and assign an encountered scalar value.
 =====================
 */
 parser.prototype.defValue = function( indent, line )
@@ -815,6 +841,9 @@ parser.prototype.defValue = function( indent, line )
 /*
 =====================
 parser.prototype.readBlock
+
+Read a block of folded or literal text. This also handles data types that
+can be encoded in such blocks (JSON, CSV, base64/hex/binary strings).
 =====================
 */
 parser.prototype.readBlock = function( indent, spec )
@@ -920,6 +949,21 @@ parser.prototype.readBlock = function( indent, spec )
 /*
 =====================
 parse
+
+Parses a DEET document, returning the result.
+
+The available options are:
+  * noThrow - if true, do not throw exceptions (return `null` instead)
+  * mapReplace - Replace existing map keys without error
+  * mapMultiple - For keys with multiple values, automatically assemble them 
+    into an array
+  * meta - map of metadata handlers (functions or function names)
+  * defaultSection - Set the default section name (usually "main")
+  * noSections - Do not allow section definitions. The returned value will
+    not be in a section wrapper.
+
+@param string text Document to parse
+@param object options Optional configuration for the parser  
 =====================
 */
 _static.parse = function( text, options )
